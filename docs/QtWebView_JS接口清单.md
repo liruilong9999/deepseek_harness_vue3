@@ -2,11 +2,9 @@
 
 ## 1. 文档目标
 
-本文档根据当前界面元素整理 QtWebView(Qt 网页视图) 与 JavaScript(JS，浏览器脚本语言) 之间的桥接接口。本文不定义 HTTP(超文本传输协议)接口，所有交互均通过 QtWebView / QtWebEngine 内嵌页面与 Qt 后端之间的本地桥接完成。
+本文档根据界面元素整理 QtWebView(Qt 网页视图) 与 JavaScript(JS，浏览器脚本语言) 之间的桥接接口契约。本文不定义 HTTP(超文本传输协议)接口，所有交互均通过 QtWebView / QtWebEngine 内嵌页面与 Qt 后端之间的本地桥接完成。
 
 推荐桥接方式为 QWebChannel(Qt Web 通道)：前端通过 `window.harnessBridge` 调用 Qt 后端槽函数，Qt 后端通过 `runJavaScript` 或 QWebChannel 回调调用前端注册在 `window.HarnessUI` 上的方法。
-
-补充说明：当前 C++ 后端第一版尚未实现 `window.harnessBridge.invoke` 统一入口，也没有通过 `runJavaScript` 主动调用 `window.HarnessUI.dispatch`。当前真实暴露给页面的是 QWebChannel 对象 `deepseek`，前端需要先按第 2.4 节接入，或在前端封装一层 `window.harnessBridge.invoke` 适配器。
 
 ## 2. 总体通信约定
 
@@ -66,7 +64,7 @@ window.HarnessUI.dispatch(eventName: string, payload: object): void
 
 ### 2.3 界面元素与桥接接口对照
 
-下表按当前界面可见元素整理，便于 Qt 后端直接确认需要实现哪些 QtWebView 到 JavaScript(JS，浏览器脚本语言) 的桥接能力。
+下表按界面可见元素整理，作为 QtWebView 到 JavaScript(JS，浏览器脚本语言) 的桥接能力契约。
 
 | 界面区域 | 界面元素 | 前端发送给后端 | 后端推送或返回给前端 |
 |---|---|---|---|
@@ -84,116 +82,6 @@ window.HarnessUI.dispatch(eventName: string, payload: object): void
 | 右侧栏 | 执行计划列表、未完成/执行中/已完成状态图标 | `plan.getCurrent` | `execution.plan.updated` |
 | 右侧栏 | Git 状态、查看 Git 面板 | `git.getStatus`、`git.openPanel` | `git.status.updated` |
 | 右侧栏 | 总上下文、Token 指标、缓存命中率、占用进度条 | `context.getUsage` | `context.usage.updated` |
-
-### 2.4 当前 C++ 后端已暴露的 QWebChannel 接口
-
-当前 `DeepSeekUi` 由 `ChannelJS` 插件创建 `LWebView` 并加载前端开发服务：
-
-```text
-http://localhost:5173
-```
-
-页面创建后，插件会向 QWebChannel 注册对象：
-
-```ts
-channel.objects.deepseek
-```
-
-前端建议初始化方式：
-
-```ts
-new QWebChannel(qt.webChannelTransport, (channel) => {
-  window.deepseek = channel.objects.deepseek
-})
-```
-
-#### 2.4.1 当前可直接调用的方法
-
-这些方法是当前 C++ 后端已经存在的真实槽函数，返回数据为 JS 对象，而不是 JSON 字符串。需要注意：Qt5 的 `qwebchannel.js` 调用带返回值的槽函数时，结果通常通过最后一个回调参数异步返回，前端建议先封装成 `Promise` 再给业务层使用。
-
-```ts
-function callDeepSeek(method, ...args) {
-  return new Promise((resolve) => {
-    window.deepseek[method](...args, (result) => resolve(result))
-  })
-}
-```
-
-| 方法 | 参数 | 返回要点 | 可映射的规划 action |
-|---|---|---|---|
-| `deepseek.listSessions(projectPath)` | `projectPath: string`，为空时使用当前工作目录 | `{ success, project_path, items, count }` | `project.list` |
-| `deepseek.createSession(projectPath, sessionName)` | `projectPath: string`、`sessionName: string` | `{ success, session_id, session_name, project_path, ... }` | `conversation.create` |
-| `deepseek.getSessionInfo(sessionId)` | `sessionId: string` | `{ success, session_id, session_name, message_count, round, ... }` | `conversation.getDetail` 的基础会话信息部分 |
-| `deepseek.sendMessage(sessionId, text, parentTaskId)` | `sessionId: string`、`text: string`、`parentTaskId?: string` | `{ success, task_id, session_id, status, ... }` | `conversation.sendMessage` |
-| `deepseek.cancelTask(taskId)` | `taskId: string` | `{ success, task_id, session_id, status, ... }` | `conversation.stopGeneration` |
-| `deepseek.answerApproval(approvalId, approved, rememberChoice)` | `approvalId: string`、`approved: boolean`、`rememberChoice: boolean` | `{ success, approval_id, task_id, approved, remember_choice }` | `approval.respond` |
-| `deepseek.listTasks(sessionId)` | `sessionId: string`，为空时返回全部任务 | `{ success, session_id, items, count }` | 可用于任务列表、执行状态面板 |
-
-当前返回结构使用 snake_case(下划线命名)，例如 `session_id`、`task_id`、`error_message`。如前端内部统一使用 camelCase(小驼峰命名)，需要在前端桥接层做一次字段转换。
-
-#### 2.4.2 当前可订阅的后端信号
-
-这些信号是当前 C++ 后端真实发出的 Qt 信号，可直接通过 QWebChannel 订阅：
-
-```ts
-window.deepseek.assistantChunk.connect((payload) => {
-  window.HarnessUI.dispatch('conversation.message.delta', payload)
-})
-```
-
-| 信号 | payload 关键字段 | 建议映射事件 |
-|---|---|---|
-| `sessionChanged(payload)` | `session_id`、`session_name`、`project_path`、`message_count` | `conversation.updated`、`project.list.updated` |
-| `taskQueued(payload)` | `task_id`、`parent_task_id`、`session_id`、`status='queued'`、`created_at` | `tool.execution.updated` 或任务队列状态 |
-| `taskStarted(payload)` | `task_id`、`parent_task_id`、`session_id`、`session_name` | `tool.execution.updated` |
-| `assistantChunk(payload)` | `task_id`、`session_id`、`text` | `conversation.message.delta` |
-| `taskFinished(payload)` | `task_id`、`session_id`、`success`、`final_answer`、`streamed_output` | `conversation.updated` |
-| `taskFailed(payload)` | `task_id`、`session_id`、`error_message` | `conversation.updated`、`error.raised` |
-| `taskCancelled(payload)` | `task_id`、`session_id`、`status` 或 `error_message` | `conversation.updated`、`error.raised` |
-| `approvalRequested(payload)` | `approval_id`、`task_id`、`session_id`、`title`、`reason`、`risk_level`、`action_type` | `approval.prompt.show` |
-| `errorOccurred(payload)` | `success=false`、`error_message` | `error.raised` |
-
-#### 2.4.3 前端适配层建议
-
-如果前端仍希望使用本文第 2.1 节的统一入口，可先在前端实现一个轻量适配器，把 action 转成当前 `deepseek` 直接方法：
-
-```ts
-const actionMap = {
-  'project.list': (payload) => callDeepSeek('listSessions', payload.projectPath ?? ''),
-  'conversation.create': (payload) => callDeepSeek('createSession', payload.projectPath ?? '', payload.title ?? ''),
-  'conversation.getDetail': (payload) => callDeepSeek('getSessionInfo', payload.conversationId),
-  'conversation.sendMessage': (payload) => callDeepSeek('sendMessage', payload.conversationId, payload.content, payload.parentTaskId ?? ''),
-  'conversation.stopGeneration': (payload) => callDeepSeek('cancelTask', payload.taskId),
-  'approval.respond': (payload) => callDeepSeek(
-    'answerApproval',
-    payload.promptId,
-    payload.decision === 'approve_once' || payload.decision === 'approve_always',
-    payload.decision === 'approve_always'
-  )
-}
-```
-
-需要注意：`conversation.stopGeneration` 当前后端按 `taskId` 取消任务，不按 `messageId` 取消。因此发送消息后前端必须保存 `sendMessage` 返回的 `task_id`，并在停止生成时传回该任务编号。
-
-#### 2.4.4 当前清单中尚未有后端实现的动作
-
-以下动作在界面清单中已经规划，但当前 C++ 后端还没有对应 QWebChannel 方法，前端暂时只能本地处理、禁用入口或等待后端补齐：
-
-| 分类 | 未实现动作 |
-|---|---|
-| 初始化 | `app.getSnapshot`、`app.refresh` |
-| 项目 | `project.open`、`project.toggleExpanded` |
-| 会话 | `conversation.open`、`conversation.rename`、`conversation.refresh`、`conversation.getActions`、`conversation.runAction` |
-| 消息 | `message.copy` |
-| 文件 | `file.pickAttachment`、`file.openGenerated` |
-| 上下文 | `context.pick`、`context.getUsage` |
-| 工具 | `tool.pick` |
-| 设置 | `settings.updateRuntime` |
-| 计划 | `plan.getCurrent`、`plan.respond` |
-| Git | `git.getStatus`、`git.openPanel` |
-| 搜索和面板 | `search.query`、`panel.open` |
-
-同时，当前后端尚未推送 `app.snapshot.updated`、`project.list.updated`、`execution.plan.updated`、`tool.execution.updated`、`generated.files.updated`、`plan.prompt.show`、`prompt.hide`、`git.status.updated`、`context.usage.updated`、`settings.updated` 这些语义化事件。前端可先将 `deepseek` 信号转换为本文约定事件名，后续后端若补统一事件层，再切换到统一事件层即可。
 
 ## 3. 页面全量数据接口
 
