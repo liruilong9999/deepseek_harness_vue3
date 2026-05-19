@@ -9,10 +9,10 @@
       </div>
 
       <div class="header-tools">
-        <button class="top-tool" title="同步" type="button">
+        <button class="top-tool" title="同步" type="button" @click="emit('refresh-conversation')">
           <RefreshCw class="button-icon" />
         </button>
-        <button class="top-tool" title="更多" type="button">
+        <button class="top-tool" title="更多" type="button" @click="emit('get-conversation-actions')">
           <MoreVertical class="button-icon" />
         </button>
       </div>
@@ -31,7 +31,7 @@
           <p>
             帮我设计一个基于 Qt5 的 DeepSeek Harness GUI，替代当前复杂的 CLI，要求包含插件管理、工具调用、审批流程和内置 Web 预览能力。
           </p>
-          <button class="message-copy" type="button" title="复制">
+          <button class="message-copy" type="button" title="复制" @click="emit('copy-message', 'demo-user-message')">
             <Copy class="button-icon" />
           </button>
         </div>
@@ -75,7 +75,13 @@
           <div class="generated-files">
             <span>生成了以下文件（12）</span>
             <div class="file-chip-row">
-              <button v-for="file in generatedFiles" :key="file.name" class="file-chip" type="button">
+              <button
+                v-for="file in generatedFiles"
+                :key="file.name"
+                class="file-chip"
+                type="button"
+                @click="emit('open-generated-file', file)"
+              >
                 <FileText class="file-icon" />
                 <strong>{{ file.name }}</strong>
                 <small>{{ file.path }}</small>
@@ -88,10 +94,10 @@
     </section>
 
     <section class="composer">
-      <section v-if="showApprovalPopover" class="approval-popover">
+      <section v-if="visiblePrompt" class="approval-popover">
         <div class="approval-popover-header">
-          <strong>{{ activePrompt.title }}</strong>
-          <div class="prompt-tabs">
+          <strong>{{ visiblePrompt.title }}</strong>
+          <div v-if="!bridgePrompt" class="prompt-tabs">
             <button
               v-for="prompt in promptModes"
               :key="prompt.type"
@@ -102,32 +108,32 @@
               {{ prompt.label }}
             </button>
           </div>
-          <button class="popover-close" type="button" title="关闭" @click="showApprovalPopover = false">
+          <button class="popover-close" type="button" title="关闭" @click="handlePromptClose">
             <X class="button-icon" />
           </button>
         </div>
-        <p>{{ activePrompt.description }}</p>
+        <p>{{ visiblePrompt.description }}</p>
         <div class="prompt-option-list">
-          <button v-for="option in activePrompt.options" :key="option" class="prompt-option" type="button">
-            {{ option }}
+          <button v-for="option in visiblePrompt.options" :key="option.value" class="prompt-option" type="button" @click="handlePromptOption(option)">
+            {{ option.label }}
           </button>
         </div>
-        <div v-if="activePromptType === 'plan'" class="custom-plan-row">
-          <input placeholder="自定义输入" />
-          <button type="button">发送</button>
+        <div v-if="visiblePrompt.type === 'plan'" class="custom-plan-row">
+          <input v-model="customPlanText" placeholder="自定义输入" />
+          <button type="button" @click="handleCustomPlanSend">发送</button>
         </div>
       </section>
 
-      <textarea rows="4" placeholder="描述任务，或输入 / 命令..."></textarea>
+      <textarea v-model="composerText" rows="4" placeholder="描述任务，或输入 / 命令..."></textarea>
       <div class="composer-tools">
         <div class="quick-icons">
-          <button title="附加文件" type="button">
+          <button title="附加文件" type="button" @click="emit('pick-attachment')">
             <Paperclip class="button-icon" />
           </button>
-          <button title="提及上下文" type="button">
+          <button title="提及上下文" type="button" @click="emit('pick-context')">
             <AtSign class="button-icon" />
           </button>
-          <button title="插入工具" type="button">
+          <button title="插入工具" type="button" @click="emit('pick-tool')">
             <Blocks class="button-icon" />
           </button>
         </div>
@@ -189,7 +195,7 @@
               </div>
             </div>
           </div>
-          <button class="send-button" type="button" title="发送">
+          <button class="send-button" type="button" title="发送" @click="handleSendMessage">
             <img
               class="send-icon-image"
               src="https://upload.wikimedia.org/wikipedia/commons/5/59/Up_arrow_white.svg"
@@ -223,9 +229,9 @@ import {
   X,
 } from 'lucide-vue-next'
 
-import type { GeneratedFile, ToolExecution } from '@/types/business/harness'
+import type { BridgePromptState, GeneratedFile, PromptOption, ToolExecution } from '@/types/business/harness'
 
-defineProps<{
+const props = defineProps<{
   /** 当前会话标题。 */
   title: string
   /** 助手回复中的功能点。 */
@@ -236,7 +242,46 @@ defineProps<{
   toolExecutions: ToolExecution[]
   /** 生成文件列表。 */
   generatedFiles: GeneratedFile[]
+  /** 后端推送的审批或计划弹窗。 */
+  bridgePrompt: BridgePromptState | null
 }>()
+
+const emit = defineEmits<{
+  /** 请求刷新当前会话。 */
+  'refresh-conversation': []
+  /** 请求获取当前会话的更多操作。 */
+  'get-conversation-actions': []
+  /** 请求复制指定消息。 */
+  'copy-message': [messageId: string]
+  /** 请求打开生成文件。 */
+  'open-generated-file': [file: GeneratedFile]
+  /** 请求选择附件。 */
+  'pick-attachment': []
+  /** 请求选择上下文。 */
+  'pick-context': []
+  /** 请求选择工具。 */
+  'pick-tool': []
+  /** 请求发送消息。 */
+  'send-message': [payload: { content: string; settings: RuntimeSettingsPayload }]
+  /** 请求更新运行配置。 */
+  'runtime-settings-change': [settings: RuntimeSettingsPayload]
+  /** 回复审批弹窗。 */
+  'approval-response': [payload: { promptId: string; taskId?: string; decision: string }]
+  /** 回复计划弹窗。 */
+  'plan-response': [payload: { promptId: string; taskId?: string; selectedValue: string; customText?: string }]
+  /** 请求关闭当前弹窗。 */
+  'prompt-close': [promptId?: string]
+}>()
+
+/** 发送给后端的运行配置。 */
+interface RuntimeSettingsPayload {
+  /** 审批模式。 */
+  approvalMode: string
+  /** 模型名称。 */
+  model: string
+  /** 思考强度。 */
+  thinkingStrength: string
+}
 
 /** 审批模式下拉选项。 */
 const approvalOptions = ['审批模式（推荐）', '完全访问权限'] as const
@@ -268,6 +313,12 @@ const promptModes = [
 /** 当前打开的底部下拉菜单。 */
 const openedMenu = ref<'approval' | 'intelligence' | ''>('')
 
+/** 输入框正文。 */
+const composerText = ref('')
+
+/** 自定义计划输入内容。 */
+const customPlanText = ref('')
+
 /** 当前对话面板根节点，用于判断下拉弹层的外部点击。 */
 const conversationPanelRef = ref<HTMLElement | null>(null)
 
@@ -287,7 +338,38 @@ const selectedModel = ref<(typeof modelOptions)[number]>('ds-v4-flash')
 const selectedThinking = ref<(typeof thinkingOptions)[number]>('high')
 
 /** 当前弹窗配置。 */
-const activePrompt = computed(() => promptModes.find((prompt) => prompt.type === activePromptType.value) ?? promptModes[0])
+const activePrompt = computed<BridgePromptState>(() => {
+  const prompt = promptModes.find((item) => item.type === activePromptType.value) ?? promptModes[0]
+
+  return {
+    type: prompt.type,
+    promptId: '',
+    title: prompt.title,
+    description: prompt.description,
+    options: prompt.options.map((option) => ({ value: option, label: option })),
+    allowCustomInput: prompt.type === 'plan',
+  }
+})
+
+/** 当前需要展示的审批或计划弹窗。 */
+const visiblePrompt = computed(() => props.bridgePrompt ?? (showApprovalPopover.value ? activePrompt.value : null))
+
+/** 当前后端运行配置。 */
+const runtimeSettings = computed<RuntimeSettingsPayload>(() => ({
+  approvalMode: selectedApproval.value === approvalOptions[0] ? 'approval_recommended' : 'full_access',
+  model: toBackendModelName(selectedModel.value),
+  thinkingStrength: selectedThinking.value,
+}))
+
+/**
+ * 将界面短模型名转换为后端模型名。
+ *
+ * @param model 界面模型名
+ * @returns 后端模型名
+ */
+function toBackendModelName(model: (typeof modelOptions)[number]) {
+  return model.replace('ds-', 'deepseek-')
+}
 
 /**
  * 切换弹窗展示类型。
@@ -351,6 +433,7 @@ function handleDocumentKeydown(event: KeyboardEvent) {
 function selectApproval(mode: (typeof approvalOptions)[number]) {
   selectedApproval.value = mode
   openedMenu.value = ''
+  emit('runtime-settings-change', runtimeSettings.value)
 }
 
 /**
@@ -360,6 +443,7 @@ function selectApproval(mode: (typeof approvalOptions)[number]) {
  */
 function selectModel(model: (typeof modelOptions)[number]) {
   selectedModel.value = model
+  emit('runtime-settings-change', runtimeSettings.value)
 }
 
 /**
@@ -369,6 +453,82 @@ function selectModel(model: (typeof modelOptions)[number]) {
  */
 function selectThinking(level: (typeof thinkingOptions)[number]) {
   selectedThinking.value = level
+  emit('runtime-settings-change', runtimeSettings.value)
+}
+
+/**
+ * 发送输入框消息。
+ */
+function handleSendMessage() {
+  const content = composerText.value.trim()
+
+  if (!content) {
+    return
+  }
+
+  emit('send-message', {
+    content,
+    settings: runtimeSettings.value,
+  })
+  composerText.value = ''
+}
+
+/**
+ * 处理弹窗选项点击。
+ *
+ * @param option 弹窗选项
+ */
+function handlePromptOption(option: PromptOption) {
+  const prompt = visiblePrompt.value
+
+  if (!prompt) {
+    return
+  }
+
+  if (prompt.type === 'permission') {
+    emit('approval-response', {
+      promptId: prompt.promptId,
+      taskId: prompt.taskId,
+      decision: option.value,
+    })
+    return
+  }
+
+  if (option.value !== 'custom') {
+    emit('plan-response', {
+      promptId: prompt.promptId,
+      taskId: prompt.taskId,
+      selectedValue: option.value,
+    })
+  }
+}
+
+/**
+ * 发送自定义计划内容。
+ */
+function handleCustomPlanSend() {
+  const prompt = visiblePrompt.value
+  const customText = customPlanText.value.trim()
+
+  if (!prompt || prompt.type !== 'plan') {
+    return
+  }
+
+  emit('plan-response', {
+    promptId: prompt.promptId,
+    taskId: prompt.taskId,
+    selectedValue: 'custom',
+    customText,
+  })
+  customPlanText.value = ''
+}
+
+/**
+ * 关闭当前审批或计划弹窗。
+ */
+function handlePromptClose() {
+  emit('prompt-close', visiblePrompt.value?.promptId)
+  showApprovalPopover.value = false
 }
 
 onMounted(() => {

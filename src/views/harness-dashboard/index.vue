@@ -6,6 +6,10 @@
         :projects="projects"
         :footer-items="footerItems"
         @toggle-project="handleProjectToggle"
+        @primary-action="handlePrimaryAction"
+        @open-project="handleOpenProject"
+        @open-session="handleOpenSession"
+        @footer-action="handleFooterAction"
       />
     </template>
 
@@ -15,6 +19,19 @@
       :plan-steps="planSteps"
       :tool-executions="toolExecutions"
       :generated-files="generatedFiles"
+      :bridge-prompt="bridgePrompt"
+      @refresh-conversation="handleRefreshConversation"
+      @get-conversation-actions="handleGetConversationActions"
+      @copy-message="handleCopyMessage"
+      @open-generated-file="handleOpenGeneratedFile"
+      @pick-attachment="handlePickAttachment"
+      @pick-context="handlePickContext"
+      @pick-tool="handlePickTool"
+      @send-message="handleSendMessage"
+      @runtime-settings-change="handleRuntimeSettingsChange"
+      @approval-response="handleApprovalResponse"
+      @plan-response="handlePlanResponse"
+      @prompt-close="handlePromptClose"
     />
 
     <template #inspector>
@@ -23,6 +40,8 @@
         :session-info="sessionInfo"
         :tool-calls="toolCalls"
         :plugins="plugins"
+        :git-status="gitStatus"
+        :context-usage="contextUsage"
       />
     </template>
   </HarnessLayout>
@@ -47,6 +66,25 @@ const {
   sessionInfo,
   toolCalls,
   plugins,
+  gitStatus,
+  contextUsage,
+  bridgePrompt,
   handleProjectToggle,
+  handlePrimaryAction,
+  handleOpenProject,
+  handleOpenSession,
+  handleFooterAction,
+  handleRefreshConversation,
+  handleGetConversationActions,
+  handleCopyMessage,
+  handleOpenGeneratedFile,
+  handlePickAttachment,
+  handlePickContext,
+  handlePickTool,
+  handleSendMessage,
+  handleRuntimeSettingsChange,
+  handleApprovalResponse,
+  handlePlanResponse,
+  handlePromptClose,
 } = useHarnessDashboard()
 </script>

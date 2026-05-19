@@ -29,17 +29,17 @@
           </button>
         </div>
         <div class="git-row">
-          <span>main</span>
-          <small>当前分支</small>
-          <strong>已提交</strong>
-          <code>a1b2c3d</code>
+          <span>{{ gitStatus.branch }}</span>
+          <small>{{ gitStatus.branchLabel }}</small>
+          <strong>{{ gitStatus.commitStatus }}</strong>
+          <code>{{ gitStatus.shortCommit }}</code>
         </div>
         <div class="change-meter">
           <span>变更文件</span>
-          <b class="add">+12</b>
-          <b>~4</b>
-          <b class="remove">-1</b>
-          <div class="meter-track"><i></i></div>
+          <b class="add">+{{ gitStatus.changes.added }}</b>
+          <b>~{{ gitStatus.changes.modified }}</b>
+          <b class="remove">-{{ gitStatus.changes.removed }}</b>
+          <div class="meter-track"><i :style="{ width: gitChangeMeterWidth }"></i></div>
         </div>
         <button class="ghost-button" type="button">查看 Git 面板</button>
       </section>
@@ -54,34 +54,34 @@
         <div class="context-grid">
           <article>
             <span>输入 Token（未命中）</span>
-            <strong>6.4K</strong>
+            <strong>{{ formatToken(contextUsage.inputTokenMiss) }}</strong>
           </article>
           <article>
             <span>输入 Token（命中）</span>
-            <strong>11.8K</strong>
+            <strong>{{ formatToken(contextUsage.inputTokenHit) }}</strong>
           </article>
           <article>
             <span>输出 Token</span>
-            <strong>4.8K</strong>
+            <strong>{{ formatToken(contextUsage.outputToken) }}</strong>
           </article>
           <article>
             <span>缓存命中率</span>
-            <strong>82%</strong>
+            <strong>{{ formatPercent(contextUsage.cacheHitRate) }}</strong>
           </article>
         </div>
         <div class="context-usage">
           <div>
             <span>会话总上下文</span>
-            <strong>32K</strong>
+            <strong>{{ formatToken(contextUsage.sessionTotalContext) }}</strong>
           </div>
           <div>
             <span>已用上下文</span>
-            <strong>23K</strong>
+            <strong>{{ formatToken(contextUsage.usedContext) }}</strong>
           </div>
           <div class="context-track">
-            <i></i>
+            <i :style="{ width: contextUsageRateText }"></i>
           </div>
-          <footer>占用 72%</footer>
+          <footer>占用 {{ contextUsageRateText }}</footer>
         </div>
       </section>
     </div>
@@ -89,11 +89,13 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+
 import { ChevronUp, Circle, CircleCheck, Gauge, GitBranch, ListChecks, LoaderCircle } from 'lucide-vue-next'
 
-import type { DefinitionListItem, PluginItem, ToolCallItem } from '@/types/business/harness'
+import type { ContextUsage, DefinitionListItem, GitStatus, PluginItem, ToolCallItem } from '@/types/business/harness'
 
-defineProps<{
+const props = defineProps<{
   /** 右侧执行计划步骤列表。 */
   planSteps: string[]
   /** 当前会话基础信息，保留给父级数据契约。 */
@@ -102,7 +104,50 @@ defineProps<{
   toolCalls: ToolCallItem[]
   /** 插件运行状态列表，保留给父级数据契约。 */
   plugins: PluginItem[]
+  /** Git 状态。 */
+  gitStatus: GitStatus
+  /** 上下文用量状态。 */
+  contextUsage: ContextUsage
 }>()
+
+/** Git 变更条占用宽度。 */
+const gitChangeMeterWidth = computed(() => {
+  const { added, modified, removed } = props.gitStatus.changes
+  const total = added + modified + removed
+
+  if (total <= 0) {
+    return '0%'
+  }
+
+  return `${Math.min(100, Math.round(((added + modified) / total) * 100))}%`
+})
+
+/** 上下文占用率文案。 */
+const contextUsageRateText = computed(() => formatPercent(props.contextUsage.usageRate))
+
+/**
+ * 格式化 Token 数值。
+ *
+ * @param value Token 数值
+ * @returns 界面展示文案
+ */
+function formatToken(value: number) {
+  if (value >= 1000) {
+    return `${Number((value / 1000).toFixed(1))}K`
+  }
+
+  return `${value}`
+}
+
+/**
+ * 格式化百分比。
+ *
+ * @param value 小数百分比
+ * @returns 百分比文案
+ */
+function formatPercent(value: number) {
+  return `${Math.round(value * 100)}%`
+}
 
 /**
  * 根据计划步骤位置生成演示状态。

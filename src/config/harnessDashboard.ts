@@ -27,10 +27,10 @@ import type {
  * 侧边栏主导航演示数据。
  */
 export const navigationItems: NavigationItem[] = [
-  { icon: MessageSquarePlus, label: '新对话', shortcut: 'Ctrl+N' },
-  { icon: Search, label: '搜索', shortcut: 'Ctrl+F' },
-  { icon: Blocks, label: '插件', badge: '12' },
-  { icon: Workflow, label: '自动化', badge: '3' },
+  { id: 'new-conversation', icon: MessageSquarePlus, label: '新对话', shortcut: 'Ctrl+N' },
+  { id: 'search', icon: Search, label: '搜索', shortcut: 'Ctrl+F' },
+  { id: 'plugins', icon: Blocks, label: '插件', badge: '12' },
+  { id: 'automation', icon: Workflow, label: '自动化', badge: '3' },
 ]
 
 /**
@@ -96,10 +96,10 @@ export const projectItems: ProjectItem[] = [
  * 侧边栏底部操作演示数据。
  */
 export const footerItems: FooterItem[] = [
-  { icon: Settings, label: '设置' },
-  { icon: Keyboard, label: '快捷键' },
-  { icon: CircleHelp, label: '帮助' },
-  { icon: Info, label: '关于' },
+  { id: 'settings', icon: Settings, label: '设置', panel: 'settings' },
+  { id: 'shortcuts', icon: Keyboard, label: '快捷键', panel: 'shortcuts' },
+  { id: 'help', icon: CircleHelp, label: '帮助', panel: 'help' },
+  { id: 'about', icon: Info, label: '关于', panel: 'about' },
 ]
 
 /**

@@ -1,7 +1,7 @@
 <template>
   <aside class="sidebar">
     <nav class="primary-actions">
-      <button v-for="item in navigationItems" :key="item.label" class="nav-action" type="button">
+      <button v-for="item in navigationItems" :key="item.label" class="nav-action" type="button" @click="emit('primary-action', item)">
         <span class="nav-icon-wrap">
           <component :is="item.icon" class="nav-icon" />
         </span>
@@ -30,7 +30,7 @@
             <article
               class="project-item"
               :class="{ active: project.active }"
-              @click="emit('toggle-project', project.name)"
+              @click="emit('open-project', project)"
             >
               <FolderClosed class="folder-icon" />
               <div class="project-meta">
@@ -38,7 +38,7 @@
                 <small>{{ project.path }}</small>
               </div>
               <time>{{ project.time }}</time>
-              <button class="project-toggle" type="button" @click.stop="emit('toggle-project', project.name)">
+              <button class="project-toggle" type="button" @click.stop="emit('toggle-project', project)">
                 <ChevronUp v-if="project.expanded" class="button-icon" />
                 <ChevronDown v-else class="button-icon" />
               </button>
@@ -51,6 +51,7 @@
                 class="project-session"
                 :class="{ active: session.active }"
                 type="button"
+                @click="emit('open-session', session)"
               >
                 <CircleCheck class="session-state" />
                 <span>{{ session.title }}</span>
@@ -63,7 +64,7 @@
     </section>
 
     <footer class="sidebar-footer">
-      <button v-for="item in footerItems" :key="item.label" type="button">
+      <button v-for="item in footerItems" :key="item.label" type="button" @click="emit('footer-action', item)">
         <component :is="item.icon" class="footer-icon" />
         {{ item.label }}
       </button>
@@ -74,7 +75,7 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronUp, CircleCheck, FolderClosed, Plus, RefreshCw } from 'lucide-vue-next'
 
-import type { FooterItem, NavigationItem, ProjectItem } from '@/types/business/harness'
+import type { FooterItem, NavigationItem, ProjectItem, SessionItem } from '@/types/business/harness'
 
 defineProps<{
   /** 侧边栏顶部主导航。 */
@@ -86,8 +87,16 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  /** 点击项目或展开按钮时触发，参数为项目名称。 */
-  'toggle-project': [projectName: string]
+  /** 点击主导航时触发。 */
+  'primary-action': [item: NavigationItem]
+  /** 点击项目时触发。 */
+  'open-project': [project: ProjectItem]
+  /** 点击项目展开按钮时触发。 */
+  'toggle-project': [project: ProjectItem]
+  /** 点击会话时触发。 */
+  'open-session': [session: SessionItem]
+  /** 点击底部操作时触发。 */
+  'footer-action': [item: FooterItem]
 }>()
 </script>
 
