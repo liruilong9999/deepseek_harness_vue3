@@ -10,69 +10,70 @@
       <section class="window-status">
         <span class="connected-dot"></span>
         <span>服务已连接</span>
-        <button class="icon-button" title="更多">⌄</button>
-        <button class="window-button" title="最小化">−</button>
-        <button class="window-button" title="最大化">□</button>
-        <button class="window-button close" title="关闭">×</button>
+        <button class="top-tool" title="更多" type="button">⌄</button>
+        <button class="window-button" title="最小化" type="button">−</button>
+        <button class="window-button" title="最大化" type="button">□</button>
+        <button class="window-button" title="还原" type="button">◱</button>
+        <button class="window-button close" title="关闭" type="button">×</button>
       </section>
     </header>
 
     <section class="workspace">
       <aside class="sidebar">
-        <nav class="primary-actions">
-          <button v-for="item in navigationItems" :key="item.label" class="nav-action" type="button">
-            <span class="nav-icon">{{ item.icon }}</span>
-            <span>{{ item.label }}</span>
-            <kbd v-if="item.shortcut">{{ item.shortcut }}</kbd>
-            <span v-if="item.badge" class="badge">{{ item.badge }}</span>
-          </button>
-        </nav>
+        <div class="sidebar-scroll">
+          <nav class="primary-actions">
+            <button v-for="item in navigationItems" :key="item.label" class="nav-action" type="button">
+              <span class="nav-icon">{{ item.icon }}</span>
+              <span>{{ item.label }}</span>
+              <kbd v-if="item.shortcut">{{ item.shortcut }}</kbd>
+              <span v-if="item.badge" class="badge">{{ item.badge }}</span>
+            </button>
+          </nav>
 
-        <section class="sidebar-section">
-          <div class="section-title">
-            <span>项目</span>
-            <div class="section-actions">
-              <button class="mini-button" title="新增项目">＋</button>
-              <button class="mini-button" title="收起">⌃</button>
-            </div>
-          </div>
-
-          <div class="project-list">
-            <article
-              v-for="project in projects"
-              :key="project.name"
-              class="project-item"
-              :class="{ active: project.active }"
-            >
-              <span class="folder-icon">▣</span>
-              <div>
-                <strong>{{ project.name }}</strong>
-                <small>{{ project.path }}</small>
+          <section class="sidebar-section">
+            <div class="section-title">
+              <span>项目</span>
+              <div class="section-actions">
+                <button class="mini-button" title="新增项目" type="button">＋</button>
+                <button class="mini-button" title="刷新项目" type="button">⟳</button>
               </div>
-              <span class="project-time">{{ project.time }}</span>
-            </article>
-          </div>
-        </section>
+            </div>
 
-        <section class="sidebar-section history-section">
-          <div class="section-title">
-            <span>会话历史</span>
-            <button class="mini-button" title="收起">⌃</button>
-          </div>
+            <div class="project-list">
+              <template v-for="project in projects" :key="project.name">
+                <article
+                  class="project-item"
+                  :class="{ active: project.active }"
+                  @click="toggleProject(project)"
+                >
+                  <span class="folder-icon">▣</span>
+                  <div class="project-meta">
+                    <strong>{{ project.name }}</strong>
+                    <small>{{ project.path }}</small>
+                  </div>
+                  <time>{{ project.time }}</time>
+                  <button class="project-toggle" type="button" @click.stop="toggleProject(project)">
+                    {{ project.expanded ? '⌃' : '⌄' }}
+                  </button>
+                </article>
 
-          <div class="history-list">
-            <article
-              v-for="session in sessions"
-              :key="session.title"
-              class="history-item"
-              :class="{ active: session.active }"
-            >
-              <span class="history-state">✓</span>
-              <span>{{ session.title }}</span>
-              <time>{{ session.time }}</time>
-            </article>
-          </div>
-        </section>
+                <div v-if="project.expanded" class="project-sessions">
+                  <button
+                    v-for="session in project.sessions"
+                    :key="session.title"
+                    class="project-session"
+                    :class="{ active: session.active }"
+                    type="button"
+                  >
+                    <span class="session-state">✓</span>
+                    <span>{{ session.title }}</span>
+                    <time>{{ session.time }}</time>
+                  </button>
+                </div>
+              </template>
+            </div>
+          </section>
+        </div>
 
         <footer class="sidebar-footer">
           <button v-for="item in footerItems" :key="item.label" type="button">
@@ -84,7 +85,7 @@
 
       <section class="conversation-panel">
         <div class="conversation-header">
-          <div>
+          <div class="conversation-title">
             <h1>设计 DeepSeek Harness GUI 方案</h1>
             <button class="edit-title" type="button" title="编辑标题">✎</button>
           </div>
@@ -96,8 +97,8 @@
           </nav>
 
           <div class="header-tools">
-            <button class="icon-button" title="同步">◎</button>
-            <button class="icon-button" title="更多">⋮</button>
+            <button class="top-tool" title="同步" type="button">◎</button>
+            <button class="top-tool" title="更多" type="button">⋮</button>
           </div>
         </div>
 
@@ -109,12 +110,14 @@
                 <strong>你</strong>
                 <time>09:45</time>
               </div>
-              <p>帮我设计一个基于 Qt5 的 DeepSeek Harness GUI，替代当前复杂的 CLI，要求包含插件管理、工具调用、审批流程和内置 Web 预览能力。</p>
+              <p>
+                帮我设计一个基于 Qt5 的 DeepSeek Harness GUI，替代当前复杂的 CLI，要求包含插件管理、工具调用、审批流程和内置 Web 预览能力。
+              </p>
             </div>
           </article>
 
           <article class="message assistant-message">
-            <div class="avatar assistant">✺</div>
+            <div class="avatar assistant">✦</div>
             <div class="message-body">
               <div class="message-title">
                 <strong>DeepSeek Harness</strong>
@@ -123,10 +126,8 @@
               <p>好的，我将为你设计一个基于 Qt5 的 DeepSeek Harness GUI。以下是整体方案与关键功能模块：</p>
 
               <ul class="feature-list">
-                <li v-for="item in features" :key="item">三栏式布局：{{ item }}</li>
+                <li v-for="item in features" :key="item">{{ item }}</li>
               </ul>
-
-              <p>我将先创建项目骨架和核心界面框架。</p>
 
               <section class="plan-card">
                 <div class="card-header">
@@ -144,7 +145,7 @@
                   <strong>工具执行</strong>
                   <small>已处理 3m 12s</small>
                 </div>
-                <div class="tool-row" v-for="tool in toolExecutions" :key="tool.name">
+                <div v-for="tool in toolExecutions" :key="tool.name" class="tool-row">
                   <span class="file-icon">▧</span>
                   <code>{{ tool.name }}</code>
                   <span class="tool-command">{{ tool.detail }}</span>
@@ -314,6 +315,8 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+
 interface NavigationItem {
   icon: string
   label: string
@@ -321,11 +324,19 @@ interface NavigationItem {
   badge?: string
 }
 
+interface SessionItem {
+  title: string
+  time: string
+  active?: boolean
+}
+
 interface ProjectItem {
   name: string
   path: string
   time: string
   active?: boolean
+  expanded: boolean
+  sessions: SessionItem[]
 }
 
 interface ToolExecution {
@@ -342,23 +353,61 @@ const navigationItems: NavigationItem[] = [
   { icon: '◴', label: '自动化', badge: '3' },
 ]
 
-const projects: ProjectItem[] = [
-  { name: 'deepseek-harness-gui', path: 'D:\\work\\deepseek-harness-gui', time: '', active: true },
-  { name: 'DeepSeek-Toolkit', path: 'D:\\work\\DeepSeek-Toolkit', time: '09:21' },
-  { name: 'ChannelJS', path: 'D:\\work\\ChannelJS', time: '昨天' },
-  { name: 'QtComponents', path: 'D:\\work\\QtComponents', time: '2天前' },
-  { name: 'Harness-Scripts', path: 'D:\\work\\Harness-Scripts', time: '3天前' },
-]
-
-const sessions = [
-  { title: '设计 DeepSeek Harness GUI 方案', time: '09:45', active: true },
-  { title: '集成 ChannelJS 插件机制', time: '昨天' },
-  { title: '修复 WebEngine 崩溃问题', time: '昨天' },
-  { title: '实现沙箱执行安全策略', time: '5月23日' },
-  { title: '优化代码索引与检索', time: '5月22日' },
-  { title: '添加自动化工作流', time: '5月21日' },
-  { title: '构建发布包与打包脚本', time: '5月20日' },
-]
+const projects = ref<ProjectItem[]>([
+  {
+    name: 'deepseek-harness-gui',
+    path: 'D:\\work\\deepseek-harness-gui',
+    time: '',
+    active: true,
+    expanded: true,
+    sessions: [
+      { title: '设计 DeepSeek Harness GUI 方案', time: '09:45', active: true },
+      { title: '集成 ChannelJS 插件机制', time: '昨天' },
+      { title: '修复 WebEngine 崩溃问题', time: '昨天' },
+      { title: '实现沙箱执行安全策略', time: '5月23日' },
+    ],
+  },
+  {
+    name: 'DeepSeek-Toolkit',
+    path: 'D:\\work\\DeepSeek-Toolkit',
+    time: '09:21',
+    expanded: false,
+    sessions: [
+      { title: '工具注册表重构', time: '09:21' },
+      { title: '模型请求流式输出', time: '昨天' },
+    ],
+  },
+  {
+    name: 'ChannelJS',
+    path: 'D:\\work\\ChannelJS',
+    time: '昨天',
+    expanded: false,
+    sessions: [
+      { title: '桥接协议设计', time: '昨天' },
+      { title: 'WebChannel 对象暴露', time: '2天前' },
+    ],
+  },
+  {
+    name: 'QtComponents',
+    path: 'D:\\work\\QtComponents',
+    time: '2天前',
+    expanded: false,
+    sessions: [
+      { title: '窗口控件样式统一', time: '2天前' },
+      { title: '深色主题变量整理', time: '3天前' },
+    ],
+  },
+  {
+    name: 'Harness-Scripts',
+    path: 'D:\\work\\Harness-Scripts',
+    time: '3天前',
+    expanded: false,
+    sessions: [
+      { title: '构建发布包与打包脚本', time: '3天前' },
+      { title: '添加自动化工作流', time: '5月21日' },
+    ],
+  },
+])
 
 const footerItems = [
   { icon: '⚙', label: '设置' },
@@ -370,7 +419,7 @@ const footerItems = [
 const tabs = ['对话', '代码', '文件', '运行']
 
 const features = [
-  '会话列表 / 工作区 / 右侧检查面板',
+  '三栏式布局：会话列表 / 工作区 / 右侧检查面板',
   '插件管理：管理已安装插件、启用 / 禁用、配置权限',
   '工具调用：显示调用历史与实时状态',
   '审批流程：高风险操作需用户确认',
@@ -422,6 +471,10 @@ const plugins = [
   { name: 'ChannelJS 消息通道', state: '已连接' },
   { name: 'WebEngine 预览', state: '运行中' },
 ]
+
+function toggleProject(project: ProjectItem): void {
+  project.expanded = !project.expanded
+}
 </script>
 
 <style scoped>
@@ -434,13 +487,12 @@ const plugins = [
 }
 
 .title-bar {
-  height: 42px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px;
+  padding: 0 14px 0 16px;
   background: rgb(26, 34, 39);
-  box-sizing: border-box;
 }
 
 .brand-area,
@@ -449,7 +501,8 @@ const plugins = [
 .conversation-header,
 .panel-title,
 .composer-tools,
-.sidebar-footer {
+.sidebar-footer,
+.conversation-title {
   display: flex;
   align-items: center;
 }
@@ -459,16 +512,16 @@ const plugins = [
 }
 
 .brand-mark {
-  width: 19px;
-  height: 19px;
+  width: 22px;
+  height: 22px;
   display: inline-grid;
   place-items: center;
   color: #6bc4ff;
-  border: 1px solid rgba(93, 181, 237, 0.65);
-  border-radius: 5px;
-  font-size: 11px;
+  border-radius: 8px;
+  font-size: 12px;
   font-weight: 800;
-  box-shadow: inset 0 0 18px rgba(42, 151, 221, 0.18);
+  background: rgba(86, 170, 225, 0.14);
+  box-shadow: inset 0 0 0 1px rgba(93, 181, 237, 0.45);
 }
 
 .version,
@@ -480,13 +533,13 @@ const plugins = [
 .connected-dot {
   width: 12px;
   height: 12px;
-  border-radius: 50%;
+  border-radius: 999px;
   background: #65cf69;
   box-shadow: 0 0 13px rgba(101, 207, 105, 0.62);
 }
 
 .window-status {
-  gap: 14px;
+  gap: 10px;
 }
 
 button,
@@ -502,99 +555,110 @@ button {
   cursor: pointer;
 }
 
-.icon-button,
+.top-tool,
 .window-button,
 .mini-button {
   display: inline-grid;
   place-items: center;
-  color: #b9c4ca;
+  color: #c3cdd2;
+  border-radius: 12px;
 }
 
-.icon-button {
-  width: 25px;
-  height: 25px;
-  border-radius: 6px;
+.top-tool {
+  width: 34px;
+  height: 34px;
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .window-button {
-  width: 30px;
-  height: 28px;
+  width: 42px;
+  height: 34px;
+  font-size: 18px;
+  background: rgba(255, 255, 255, 0.055);
 }
 
-.icon-button:hover,
+.top-tool:hover,
 .window-button:hover,
 .mini-button:hover {
-  background: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .window-button.close:hover {
-  background: rgba(205, 75, 84, 0.72);
+  color: #fff;
+  background: rgba(205, 75, 84, 0.78);
 }
 
 .workspace {
-  height: calc(100vh - 42px);
+  height: calc(100vh - 50px);
   display: grid;
   grid-template-columns: 390px minmax(620px, 1fr) 470px;
-  gap: 1px;
-  padding: 0;
-  background: rgba(255, 255, 255, 0.04);
-  box-sizing: border-box;
+  gap: 8px;
+  padding: 8px;
+  background: rgb(24, 24, 24);
 }
 
 .sidebar,
 .conversation-panel,
 .inspector {
+  overflow: hidden;
+  border-radius: 18px;
   border: 0;
-  border-radius: 0;
   box-shadow: none;
 }
 
 .sidebar {
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 16px;
-  overflow: hidden;
   background: rgb(26, 34, 39);
+}
+
+.sidebar-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 16px 10px;
 }
 
 .primary-actions {
   display: grid;
-  gap: 6px;
+  gap: 7px;
   padding-bottom: 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .nav-action,
 .project-item,
-.history-item {
-  min-height: 38px;
+.project-session {
+  min-height: 40px;
   display: grid;
   align-items: center;
-  border-radius: 7px;
+  border-radius: 14px;
 }
 
 .nav-action {
-  grid-template-columns: 28px 1fr auto;
+  grid-template-columns: 30px 1fr auto;
   gap: 10px;
-  padding: 0 9px;
+  padding: 0 10px;
   color: #d4dde2;
   text-align: left;
 }
 
 .nav-action:hover,
 .project-item.active,
-.history-item.active {
-  background: rgba(130, 151, 160, 0.13);
+.project-session.active,
+.project-session:hover {
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .nav-icon {
-  width: 21px;
-  height: 21px;
+  width: 24px;
+  height: 24px;
   display: inline-grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border-radius: 9px;
   color: #dce7eb;
+  background: rgba(255, 255, 255, 0.065);
 }
 
 kbd,
@@ -604,13 +668,13 @@ kbd,
 }
 
 .badge {
-  min-width: 24px;
-  height: 22px;
+  min-width: 25px;
+  height: 23px;
   display: inline-grid;
   place-items: center;
   color: #d7e1e6;
   border-radius: 999px;
-  background: rgba(133, 151, 159, 0.18);
+  background: rgba(133, 151, 159, 0.2);
 }
 
 .sidebar-section {
@@ -630,72 +694,76 @@ kbd,
 }
 
 .mini-button {
-  width: 28px;
-  height: 28px;
-  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.045);
 }
 
-.project-list,
-.history-list {
+.project-list {
   display: grid;
-  gap: 6px;
+  gap: 7px;
+  padding-bottom: 10px;
 }
 
 .project-item {
-  grid-template-columns: 26px minmax(0, 1fr) auto;
+  grid-template-columns: 28px minmax(0, 1fr) auto 32px;
   gap: 9px;
-  padding: 7px 9px;
+  padding: 8px 8px 8px 10px;
 }
 
-.project-item strong,
-.history-item span:nth-child(2) {
+.project-meta,
+.project-meta strong,
+.project-session span:nth-child(2) {
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.project-item small {
+.project-meta small {
   display: block;
   color: #7f9099;
   font-size: 12px;
   margin-top: 2px;
 }
 
-.folder-icon {
-  color: #b5c1c8;
-}
-
-.project-time,
-.history-item time {
+.project-item time,
+.project-session time {
   color: #94a1a8;
   font-size: 13px;
 }
 
-.history-section {
-  min-height: 0;
-  flex: 1;
-  overflow: hidden;
+.folder-icon,
+.session-state {
+  color: #b5c1c8;
 }
 
-.history-list {
-  max-height: 100%;
-  overflow: auto;
+.project-toggle {
+  width: 30px;
+  height: 30px;
+  border-radius: 11px;
+  color: #b9c5ca;
+  background: rgba(255, 255, 255, 0.045);
 }
 
-.history-item {
+.project-sessions {
+  display: grid;
+  gap: 4px;
+  margin: -2px 0 5px 35px;
+}
+
+.project-session {
   grid-template-columns: 22px minmax(0, 1fr) auto;
   gap: 8px;
-  padding: 0 8px;
+  padding: 0 10px;
   color: #c1cbd1;
-}
-
-.history-state {
-  color: #9db0b9;
+  text-align: left;
 }
 
 .sidebar-footer {
-  gap: 16px;
-  padding-top: 14px;
+  flex-shrink: 0;
+  gap: 14px;
+  padding: 14px 16px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -705,9 +773,10 @@ kbd,
 }
 
 .conversation-panel {
+  position: relative;
   min-width: 0;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto 1fr;
   background: rgb(24, 24, 24);
 }
 
@@ -718,15 +787,19 @@ kbd,
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.conversation-title {
+  gap: 10px;
+}
+
 .conversation-header h1 {
-  display: inline-flex;
-  margin: 0 10px 10px 0;
+  margin: 0 0 10px;
   color: #f4f8fa;
   font-size: 17px;
   font-weight: 700;
 }
 
 .edit-title {
+  margin-bottom: 10px;
   color: #9aa7ae;
 }
 
@@ -752,13 +825,13 @@ kbd,
 .header-tools {
   margin-left: auto;
   display: flex;
-  gap: 4px;
+  gap: 6px;
 }
 
 .chat-scroll {
   min-height: 0;
   overflow: auto;
-  padding: 18px 26px 8px;
+  padding: 18px 26px 190px;
 }
 
 .message {
@@ -773,13 +846,13 @@ kbd,
   height: 36px;
   display: grid;
   place-items: center;
-  border-radius: 50%;
+  border-radius: 999px;
   font-weight: 700;
 }
 
 .avatar.user {
   background: rgba(34, 94, 148, 0.34);
-  border: 1px solid rgba(89, 164, 226, 0.28);
+  box-shadow: inset 0 0 0 1px rgba(89, 164, 226, 0.28);
 }
 
 .avatar.assistant {
@@ -825,7 +898,7 @@ kbd,
 .execution-card {
   width: min(620px, 100%);
   margin: 14px 0;
-  border-radius: 8px;
+  border-radius: 16px;
   border: 0;
   background: rgba(33, 33, 33, 0.86);
 }
@@ -902,7 +975,7 @@ kbd,
   gap: 2px 7px;
   padding: 10px;
   text-align: left;
-  border-radius: 7px;
+  border-radius: 14px;
   border: 0;
   background: rgba(38, 38, 38, 0.92);
 }
@@ -919,23 +992,29 @@ kbd,
 }
 
 .composer {
-  margin: 0 24px 16px;
-  padding: 13px;
-  border-radius: 15px;
+  position: absolute;
+  left: 24px;
+  right: 24px;
+  bottom: 18px;
+  z-index: 4;
+  padding: 14px;
+  border-radius: 22px;
   border: 0;
-  background: rgba(38, 38, 38, 0.96);
+  background: rgba(38, 38, 38, 0.98);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.34);
 }
 
 .composer textarea {
   width: 100%;
-  resize: none;
+  max-height: 110px;
+  resize: vertical;
   box-sizing: border-box;
-  padding: 10px;
+  padding: 12px;
   color: #e1eaee;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 7px;
+  border: 0;
+  border-radius: 16px;
   outline: none;
-  background: rgba(24, 24, 24, 0.82);
+  background: rgba(24, 24, 24, 0.86);
 }
 
 .composer textarea::placeholder {
@@ -954,9 +1033,11 @@ kbd,
 }
 
 .quick-icons button {
-  width: 27px;
-  height: 27px;
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
   color: #b2c0c7;
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .composer label {
@@ -967,10 +1048,9 @@ kbd,
   align-items: center;
   gap: 9px;
   padding: 0 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 7px;
+  border-radius: 14px;
   color: #9fadb4;
-  box-sizing: border-box;
+  background: rgba(24, 24, 24, 0.72);
 }
 
 .composer select {
@@ -984,7 +1064,7 @@ kbd,
 .send-button {
   width: 104px;
   height: 44px;
-  border-radius: 8px;
+  border-radius: 14px;
   background: linear-gradient(135deg, #45ba87, #2b9a78);
   color: #ffffff;
   font-weight: 700;
@@ -1000,7 +1080,7 @@ kbd,
 }
 
 .panel-card {
-  border-radius: 7px;
+  border-radius: 16px;
   border: 0;
   background: rgba(29, 29, 29, 0.42);
 }
@@ -1064,11 +1144,11 @@ kbd,
 .call-item i {
   width: 12px;
   height: 12px;
-  border-radius: 50%;
+  border-radius: 999px;
 }
 
 .call-item i.done {
-  border: 1px solid #55c970;
+  box-shadow: inset 0 0 0 1px #55c970;
 }
 
 .call-item i.active {
@@ -1116,9 +1196,9 @@ kbd,
 }
 
 .approval-actions button {
-  height: 29px;
-  padding: 0 13px;
-  border-radius: 6px;
+  height: 31px;
+  padding: 0 14px;
+  border-radius: 12px;
   color: #fff;
   font-weight: 700;
 }
@@ -1187,11 +1267,11 @@ kbd,
 
 .ghost-button {
   width: calc(100% - 24px);
-  height: 30px;
+  height: 31px;
   margin: 10px 12px 0;
   color: #aab8bf;
   border: 0;
-  border-radius: 6px;
+  border-radius: 12px;
   background: rgba(58, 58, 58, 0.88);
 }
 
@@ -1232,7 +1312,7 @@ kbd,
   align-items: center;
   padding: 0 9px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 10px;
   color: #b9c5ca;
   background: rgba(28, 28, 28, 0.72);
 }
@@ -1243,7 +1323,7 @@ kbd,
   height: 156px;
   margin: 0 10px 10px;
   overflow: hidden;
-  border-radius: 7px;
+  border-radius: 16px;
   border: 0;
   background: rgba(28, 28, 28, 0.82);
 }
@@ -1264,7 +1344,7 @@ kbd,
 
 .preview-frame aside span {
   padding: 5px 7px;
-  border-radius: 5px;
+  border-radius: 10px;
   color: #91a0a8;
 }
 
@@ -1292,7 +1372,7 @@ kbd,
   min-height: 52px;
   display: grid;
   place-items: center;
-  border-radius: 6px;
+  border-radius: 14px;
   border: 0;
   background: rgba(47, 47, 47, 0.92);
 }
