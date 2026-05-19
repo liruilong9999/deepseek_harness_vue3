@@ -19,6 +19,7 @@
 
     <template #inspector>
       <InspectorPanel
+        :plan-steps="planSteps"
         :session-info="sessionInfo"
         :tool-calls="toolCalls"
         :plugins="plugins"

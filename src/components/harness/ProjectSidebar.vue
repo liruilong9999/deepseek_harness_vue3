@@ -1,30 +1,30 @@
 <template>
   <aside class="sidebar">
-    <div class="sidebar-scroll">
-      <nav class="primary-actions">
-        <button v-for="item in navigationItems" :key="item.label" class="nav-action" type="button">
-          <span class="nav-icon-wrap">
-            <component :is="item.icon" class="nav-icon" />
-          </span>
-          <span>{{ item.label }}</span>
-          <kbd v-if="item.shortcut">{{ item.shortcut }}</kbd>
-          <span v-if="item.badge" class="badge">{{ item.badge }}</span>
-        </button>
-      </nav>
+    <nav class="primary-actions">
+      <button v-for="item in navigationItems" :key="item.label" class="nav-action" type="button">
+        <span class="nav-icon-wrap">
+          <component :is="item.icon" class="nav-icon" />
+        </span>
+        <span>{{ item.label }}</span>
+        <kbd v-if="item.shortcut">{{ item.shortcut }}</kbd>
+        <span v-if="item.badge" class="badge">{{ item.badge }}</span>
+      </button>
+    </nav>
 
-      <section class="sidebar-section">
-        <div class="section-title">
-          <span>项目</span>
-          <div class="section-actions">
-            <button class="mini-button" title="新增项目" type="button">
-              <Plus class="button-icon" />
-            </button>
-            <button class="mini-button" title="刷新项目" type="button">
-              <RefreshCw class="button-icon" />
-            </button>
-          </div>
+    <section class="sidebar-section">
+      <div class="section-title">
+        <span>项目</span>
+        <div class="section-actions">
+          <button class="mini-button" title="新增项目" type="button">
+            <Plus class="button-icon" />
+          </button>
+          <button class="mini-button" title="刷新项目" type="button">
+            <RefreshCw class="button-icon" />
+          </button>
         </div>
+      </div>
 
+      <div class="sidebar-scroll">
         <div class="project-list">
           <template v-for="project in projects" :key="project.name">
             <article
@@ -59,8 +59,8 @@
             </div>
           </template>
         </div>
-      </section>
-    </div>
+      </div>
+    </section>
 
     <footer class="sidebar-footer">
       <button v-for="item in footerItems" :key="item.label" type="button">
@@ -77,16 +77,16 @@ import { ChevronDown, ChevronUp, CircleCheck, FolderClosed, Plus, RefreshCw } fr
 import type { FooterItem, NavigationItem, ProjectItem } from '@/types/business/harness'
 
 defineProps<{
-  /** 侧边栏顶部主导航 */
+  /** 侧边栏顶部主导航。 */
   navigationItems: NavigationItem[]
-  /** 项目与会话列表 */
+  /** 项目与会话列表。 */
   projects: ProjectItem[]
-  /** 侧边栏底部操作 */
+  /** 侧边栏底部操作项。 */
   footerItems: FooterItem[]
 }>()
 
 const emit = defineEmits<{
-  /** 点击项目或展开按钮时触发，参数为项目名称 */
+  /** 点击项目或展开按钮时触发，参数为项目名称。 */
   'toggle-project': [projectName: string]
 }>()
 </script>
@@ -97,18 +97,12 @@ const emit = defineEmits<{
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  border-radius: 1.125rem;
-  background: rgb(26, 34, 39);
-}
-
-.sidebar-scroll {
-  min-height: 0;
-  flex: 1;
-  overflow-y: auto;
-  padding: 1rem 1rem 0.625rem;
+  padding: 1rem 1rem 0;
+  background: rgb(26, 33, 44);
 }
 
 .primary-actions {
+  flex-shrink: 0;
   display: grid;
   gap: 0.4375rem;
   padding-bottom: 1.125rem;
@@ -174,10 +168,15 @@ kbd,
 }
 
 .sidebar-section {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   margin-top: 1rem;
 }
 
 .section-title {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -188,6 +187,13 @@ kbd,
 .section-actions {
   display: flex;
   gap: 0.375rem;
+}
+
+.sidebar-scroll {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  padding-bottom: 0.625rem;
 }
 
 .project-list {
@@ -256,6 +262,7 @@ kbd,
   display: flex;
   align-items: center;
   gap: 0.875rem;
+  margin: 0 -1rem;
   padding: 0.875rem 1rem;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
