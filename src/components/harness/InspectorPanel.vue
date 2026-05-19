@@ -75,7 +75,7 @@
             <strong>32K</strong>
           </div>
           <div>
-            <span>医用上下文</span>
+            <span>已用上下文</span>
             <strong>23K</strong>
           </div>
           <div class="context-track">

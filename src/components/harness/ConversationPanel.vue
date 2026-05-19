@@ -1,5 +1,5 @@
 <template>
-  <section class="conversation-panel">
+  <section ref="conversationPanelRef" class="conversation-panel">
     <div class="conversation-header">
       <div class="conversation-title">
         <h1>{{ title }}</h1>
@@ -203,7 +203,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import {
   AtSign,
@@ -268,6 +268,9 @@ const promptModes = [
 /** 当前打开的底部下拉菜单。 */
 const openedMenu = ref<'approval' | 'intelligence' | ''>('')
 
+/** 当前对话面板根节点，用于判断下拉弹层的外部点击。 */
+const conversationPanelRef = ref<HTMLElement | null>(null)
+
 /** 当前弹窗展示类型。 */
 const activePromptType = ref<(typeof promptModes)[number]['type']>('plan')
 
@@ -305,6 +308,42 @@ function toggleSelectMenu(menu: 'approval' | 'intelligence') {
 }
 
 /**
+ * 点击选择器之外的空白区域时关闭下拉弹层。
+ *
+ * @param event 指针事件
+ */
+function handleDocumentPointerDown(event: PointerEvent) {
+  if (!openedMenu.value) {
+    return
+  }
+
+  const target = event.target
+  const panelElement = conversationPanelRef.value
+
+  if (!(target instanceof Node) || !panelElement?.contains(target)) {
+    openedMenu.value = ''
+    return
+  }
+
+  const targetElement = target instanceof Element ? target : target.parentElement
+
+  if (!targetElement?.closest('.select-control')) {
+    openedMenu.value = ''
+  }
+}
+
+/**
+ * 按下 Esc 时关闭当前下拉弹层。
+ *
+ * @param event 键盘事件
+ */
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    openedMenu.value = ''
+  }
+}
+
+/**
  * 选择审批模式并关闭菜单。
  *
  * @param mode 审批模式
@@ -331,6 +370,16 @@ function selectModel(model: (typeof modelOptions)[number]) {
 function selectThinking(level: (typeof thinkingOptions)[number]) {
   selectedThinking.value = level
 }
+
+onMounted(() => {
+  document.addEventListener('pointerdown', handleDocumentPointerDown)
+  document.addEventListener('keydown', handleDocumentKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('pointerdown', handleDocumentPointerDown)
+  document.removeEventListener('keydown', handleDocumentKeydown)
+})
 </script>
 
 <style scoped lang="scss">
@@ -808,6 +857,7 @@ function selectThinking(level: (typeof thinkingOptions)[number]) {
   width: 25.25rem;
   display: grid;
   grid-template-columns: 12.75rem 12.5rem;
+  align-items: end;
   gap: 0.25rem;
   padding: 0;
   overflow: hidden;
@@ -828,6 +878,7 @@ function selectThinking(level: (typeof thinkingOptions)[number]) {
   display: grid;
   align-content: start;
   gap: 0.125rem;
+  min-height: 13.75rem;
 }
 
 .model-panel {
