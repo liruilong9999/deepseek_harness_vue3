@@ -1,4 +1,4 @@
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 
 import {
   copyMessage,
@@ -11,8 +11,10 @@ import {
   openProject,
   pickAttachment,
   pickContext,
+  pickProjectFolder,
   pickTool,
   querySearch,
+  refreshAppScopes,
   refreshConversation,
   respondApprovalPrompt,
   respondPlanPrompt,
@@ -35,8 +37,9 @@ import {
 } from '@/config/harnessDashboard'
 
 import type {
-  ContextUsage,
   BridgePromptState,
+  ContextUsage,
+  ConversationMessage,
   FooterItem,
   GeneratedFile,
   GitStatus,
@@ -46,130 +49,73 @@ import type {
   ToolExecution,
 } from '@/types/business/harness'
 
-/** 桥接 payload 中的普通对象。 */
 type PayloadRecord = Record<string, unknown>
 
-/** 运行配置参数。 */
 interface RuntimeSettingsPayload {
-  /** 审批模式。 */
   approvalMode: string
-  /** 模型名称。 */
   model: string
-  /** 思考强度。 */
   thinkingStrength: string
 }
 
-/** 发送消息参数。 */
 interface SendMessagePayload {
-  /** 消息正文。 */
   content: string
-  /** 运行配置。 */
   settings: RuntimeSettingsPayload
 }
 
-/** 审批回复参数。 */
 interface ApprovalResponsePayload {
-  /** 弹窗唯一编号。 */
   promptId: string
-  /** 关联任务编号。 */
   taskId?: string
-  /** 审批决策。 */
   decision: string
 }
 
-/** 计划回复参数。 */
 interface PlanResponsePayload {
-  /** 弹窗唯一编号。 */
   promptId: string
-  /** 关联任务编号。 */
   taskId?: string
-  /** 选中的计划值。 */
   selectedValue: string
-  /** 自定义计划内容。 */
   customText?: string
 }
 
-/** 默认 Git 状态，用于后端尚未推送前的占位展示。 */
-const defaultGitStatus: GitStatus = {
-  branch: 'main',
+const emptyGitStatus: GitStatus = {
+  branch: '',
   branchLabel: '当前分支',
-  commitStatus: '已提交',
-  shortCommit: 'a1b2c3d',
+  commitStatus: '未获取',
+  shortCommit: '',
   changes: {
-    added: 12,
-    modified: 4,
-    removed: 1,
+    added: 0,
+    modified: 0,
+    removed: 0,
   },
 }
 
-/** 默认上下文状态，用于后端尚未推送前的占位展示。 */
-const defaultContextUsage: ContextUsage = {
-  inputTokenMiss: 6400,
-  inputTokenHit: 11800,
-  outputToken: 4800,
-  cacheHitRate: 0.82,
-  sessionTotalContext: 32000,
-  usedContext: 23000,
-  usageRate: 0.72,
+const emptyContextUsage: ContextUsage = {
+  inputTokenMiss: 0,
+  inputTokenHit: 0,
+  outputToken: 0,
+  cacheHitRate: 0,
+  sessionTotalContext: 0,
+  usedContext: 0,
+  usageRate: 0,
 }
 
-/**
- * 判断值是否是普通对象。
- *
- * @param value 待判断值
- * @returns 是否为普通对象
- */
 function isRecord(value: unknown): value is PayloadRecord {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-/**
- * 从对象中读取字符串字段。
- *
- * @param payload 数据对象
- * @param key 字段名
- * @param fallback 默认值
- * @returns 字符串字段值
- */
 function readString(payload: PayloadRecord, key: string, fallback = '') {
   const value = payload[key]
-
   return typeof value === 'string' ? value : fallback
 }
 
-/**
- * 从对象中读取数字字段。
- *
- * @param payload 数据对象
- * @param key 字段名
- * @param fallback 默认值
- * @returns 数字字段值
- */
 function readNumber(payload: PayloadRecord, key: string, fallback = 0) {
   const value = payload[key]
-
   return typeof value === 'number' ? value : fallback
 }
 
-/**
- * 从对象中读取数组字段。
- *
- * @param payload 数据对象
- * @param key 字段名
- * @returns 数组字段值
- */
 function readArray(payload: PayloadRecord, key: string) {
   const value = payload[key]
-
   return Array.isArray(value) ? value : []
 }
 
-/**
- * 将后端会话数据转换为当前侧边栏展示结构。
- *
- * @param value 后端会话数据
- * @returns 侧边栏会话项
- */
 function mapSessionItem(value: unknown): SessionItem {
   if (!isRecord(value)) {
     return { title: '', time: '' }
@@ -183,12 +129,6 @@ function mapSessionItem(value: unknown): SessionItem {
   }
 }
 
-/**
- * 将后端项目数据转换为当前侧边栏展示结构。
- *
- * @param value 后端项目数据
- * @returns 侧边栏项目项
- */
 function mapProjectItem(value: unknown): ProjectItem {
   if (!isRecord(value)) {
     return {
@@ -211,22 +151,36 @@ function mapProjectItem(value: unknown): ProjectItem {
   }
 }
 
-/**
- * 将后端计划步骤转换为右侧计划文案。
- *
- * @param value 后端计划步骤
- * @returns 计划步骤标题
- */
+function mapMessage(value: unknown): ConversationMessage {
+  if (!isRecord(value)) {
+    return {
+      id: '',
+      role: 'assistant',
+      authorName: '',
+      content: '',
+      createdAtText: '',
+    }
+  }
+
+  const role = readString(value, 'role', 'assistant')
+  const normalizedRole = ['system', 'user', 'assistant', 'tool'].includes(role) ? role : 'assistant'
+
+  return {
+    id: readString(value, 'id'),
+    conversationId: readString(value, 'conversationId'),
+    role: normalizedRole as ConversationMessage['role'],
+    authorName: readString(value, 'authorName'),
+    content: readString(value, 'content'),
+    createdAtText: readString(value, 'createdAtText'),
+    status: readString(value, 'status'),
+    copyable: value.copyable !== false,
+  }
+}
+
 function mapPlanStep(value: unknown) {
   return isRecord(value) ? readString(value, 'title') : String(value)
 }
 
-/**
- * 将后端工具状态转换为界面文案。
- *
- * @param value 后端工具状态
- * @returns 工具执行记录
- */
 function mapToolExecution(value: unknown): ToolExecution {
   if (!isRecord(value)) {
     return { name: '', detail: '', state: '完成', cost: '' }
@@ -240,12 +194,6 @@ function mapToolExecution(value: unknown): ToolExecution {
   }
 }
 
-/**
- * 将后端生成文件数据转换为界面文件项。
- *
- * @param value 后端生成文件数据
- * @returns 生成文件项
- */
 function mapGeneratedFile(value: unknown): GeneratedFile {
   if (!isRecord(value)) {
     return { name: '', path: '' }
@@ -258,64 +206,44 @@ function mapGeneratedFile(value: unknown): GeneratedFile {
   }
 }
 
-/**
- * 将后端 Git 状态转换为右侧展示结构。
- *
- * @param payload 后端 Git 状态
- * @returns Git 状态
- */
 function mapGitStatus(payload: unknown): GitStatus {
   if (!isRecord(payload)) {
-    return defaultGitStatus
+    return { ...emptyGitStatus, changes: { ...emptyGitStatus.changes } }
   }
 
   const changes = isRecord(payload.changes) ? payload.changes : {}
-
   return {
     projectId: readString(payload, 'projectId'),
-    branch: readString(payload, 'branch', defaultGitStatus.branch),
-    branchLabel: readString(payload, 'branchLabel', defaultGitStatus.branchLabel),
-    commitStatus: readString(payload, 'commitStatus', defaultGitStatus.commitStatus),
-    shortCommit: readString(payload, 'shortCommit', defaultGitStatus.shortCommit),
+    branch: readString(payload, 'branch'),
+    branchLabel: readString(payload, 'branchLabel', emptyGitStatus.branchLabel),
+    commitStatus: readString(payload, 'commitStatus', emptyGitStatus.commitStatus),
+    shortCommit: readString(payload, 'shortCommit'),
     changes: {
-      added: readNumber(changes, 'added', defaultGitStatus.changes.added),
-      modified: readNumber(changes, 'modified', defaultGitStatus.changes.modified),
-      removed: readNumber(changes, 'removed', defaultGitStatus.changes.removed),
+      added: readNumber(changes, 'added'),
+      modified: readNumber(changes, 'modified'),
+      removed: readNumber(changes, 'removed'),
     },
   }
 }
 
-/**
- * 将后端上下文状态转换为右侧展示结构。
- *
- * @param payload 后端上下文状态
- * @returns 上下文状态
- */
 function mapContextUsage(payload: unknown): ContextUsage {
   if (!isRecord(payload)) {
-    return defaultContextUsage
+    return { ...emptyContextUsage }
   }
 
   return {
     projectId: readString(payload, 'projectId'),
     conversationId: readString(payload, 'conversationId'),
-    inputTokenMiss: readNumber(payload, 'inputTokenMiss', defaultContextUsage.inputTokenMiss),
-    inputTokenHit: readNumber(payload, 'inputTokenHit', defaultContextUsage.inputTokenHit),
-    outputToken: readNumber(payload, 'outputToken', defaultContextUsage.outputToken),
-    cacheHitRate: readNumber(payload, 'cacheHitRate', defaultContextUsage.cacheHitRate),
-    sessionTotalContext: readNumber(payload, 'sessionTotalContext', defaultContextUsage.sessionTotalContext),
-    usedContext: readNumber(payload, 'usedContext', defaultContextUsage.usedContext),
-    usageRate: readNumber(payload, 'usageRate', defaultContextUsage.usageRate),
+    inputTokenMiss: readNumber(payload, 'inputTokenMiss'),
+    inputTokenHit: readNumber(payload, 'inputTokenHit'),
+    outputToken: readNumber(payload, 'outputToken'),
+    cacheHitRate: readNumber(payload, 'cacheHitRate'),
+    sessionTotalContext: readNumber(payload, 'sessionTotalContext'),
+    usedContext: readNumber(payload, 'usedContext'),
+    usageRate: readNumber(payload, 'usageRate'),
   }
 }
 
-/**
- * 将后端弹窗 payload 转换为前端弹窗状态。
- *
- * @param payload 后端弹窗 payload
- * @param type 弹窗类型
- * @returns 前端弹窗状态
- */
 function mapBridgePrompt(payload: unknown, type: BridgePromptState['type']): BridgePromptState | null {
   if (!isRecord(payload)) {
     return null
@@ -339,39 +267,74 @@ function mapBridgePrompt(payload: unknown, type: BridgePromptState['type']): Bri
   }
 }
 
-/**
- * 管理 Harness 仪表盘页面的桥接状态与交互。
- *
- * @returns 页面渲染所需状态与桥接交互方法
- */
+function replaceOrAppendMessage(messageList: ConversationMessage[], message: ConversationMessage) {
+  const index = messageList.findIndex((item) => item.id === message.id)
+  if (index >= 0) {
+    messageList.splice(index, 1, { ...messageList[index], ...message })
+    return
+  }
+
+  messageList.push(message)
+}
+
 export function useHarnessDashboard() {
-  /** 项目展开状态属于页面交互状态，复制一份避免直接修改静态配置。 */
   const projects = ref(projectItems.map((project) => ({ ...project, sessions: [...project.sessions] })))
-  /** 右侧执行计划。 */
   const currentPlanSteps = ref([...planSteps])
-  /** 中间工具执行记录。 */
   const currentToolExecutions = ref([...toolExecutions])
-  /** 中间生成文件列表。 */
   const currentGeneratedFiles = ref([...generatedFiles])
-  /** 右侧 Git 状态。 */
-  const gitStatus = ref<GitStatus>({ ...defaultGitStatus, changes: { ...defaultGitStatus.changes } })
-  /** 右侧上下文状态。 */
-  const contextUsage = ref<ContextUsage>({ ...defaultContextUsage })
-  /** 当前后端推送的审批或计划弹窗。 */
+  const currentMessages = ref<ConversationMessage[]>([])
+  const currentConversationTitle = ref('')
+  const gitStatus = ref<GitStatus>({ ...emptyGitStatus, changes: { ...emptyGitStatus.changes } })
+  const contextUsage = ref<ContextUsage>({ ...emptyContextUsage })
   const bridgePrompt = ref<BridgePromptState | null>(null)
-  /** 当前项目编号。 */
-  const activeProjectId = ref(projectItems[0]?.id || projectItems[0]?.name || '')
-  /** 当前会话编号。 */
-  const activeConversationId = ref(projectItems[0]?.sessions[0]?.id || projectItems[0]?.sessions[0]?.title || '')
-  /** 取消注册后端推送事件的函数。 */
+  const activeProjectId = ref('')
+  const activeConversationId = ref('')
   let unregisterHarnessUI: (() => void) | undefined
 
-  /**
-   * 应用后端推送的全量快照。
-   *
-   * @param payload 全量快照
-   */
+  const hasProject = computed(() => activeProjectId.value.trim().length > 0)
+
+  function applyConversation(value: unknown) {
+    if (!isRecord(value)) {
+      currentConversationTitle.value = ''
+      currentMessages.value = []
+      currentToolExecutions.value = []
+      currentGeneratedFiles.value = []
+      return
+    }
+
+    currentConversationTitle.value = readString(value, 'title')
+    currentMessages.value = readArray(value, 'messages').map(mapMessage).filter((message) => message.id && message.content)
+    currentToolExecutions.value = readArray(value, 'toolExecutions').map(mapToolExecution)
+    currentGeneratedFiles.value = readArray(value, 'generatedFiles').map(mapGeneratedFile)
+  }
+
   function applySnapshot(payload: unknown) {
+    if (!isRecord(payload)) {
+      return
+    }
+
+    if (Array.isArray(payload.projects)) {
+      projects.value = payload.projects.map(mapProjectItem)
+    }
+
+    activeProjectId.value = projects.value.length > 0 ? readString(payload, 'activeProjectId') : ''
+    activeConversationId.value = readString(payload, 'activeConversationId')
+    applyConversation(payload.conversation)
+
+    currentPlanSteps.value = Array.isArray(payload.executionPlan) ? payload.executionPlan.map(mapPlanStep) : []
+    currentToolExecutions.value =
+      currentToolExecutions.value.length > 0
+        ? currentToolExecutions.value
+        : readArray(payload, 'toolExecutions').map(mapToolExecution)
+    currentGeneratedFiles.value =
+      currentGeneratedFiles.value.length > 0
+        ? currentGeneratedFiles.value
+        : readArray(payload, 'generatedFiles').map(mapGeneratedFile)
+    gitStatus.value = mapGitStatus(payload.gitStatus)
+    contextUsage.value = mapContextUsage(payload.contextUsage)
+  }
+
+  function applyProjectList(payload: unknown) {
     if (!isRecord(payload)) {
       return
     }
@@ -382,51 +345,46 @@ export function useHarnessDashboard() {
 
     activeProjectId.value = readString(payload, 'activeProjectId', activeProjectId.value)
     activeConversationId.value = readString(payload, 'activeConversationId', activeConversationId.value)
-
-    if (Array.isArray(payload.executionPlan)) {
-      currentPlanSteps.value = payload.executionPlan.map(mapPlanStep)
-    }
-
-    if (Array.isArray(payload.toolExecutions)) {
-      currentToolExecutions.value = payload.toolExecutions.map(mapToolExecution)
-    }
-
-    if (Array.isArray(payload.generatedFiles)) {
-      currentGeneratedFiles.value = payload.generatedFiles.map(mapGeneratedFile)
-    }
-
-    if (payload.gitStatus) {
-      gitStatus.value = mapGitStatus(payload.gitStatus)
-    }
-
-    if (payload.contextUsage) {
-      contextUsage.value = mapContextUsage(payload.contextUsage)
-    }
   }
 
-  /**
-   * 切换项目的会话展开状态，并通知后端。
-   *
-   * @param project 项目
-   */
   function handleProjectToggle(project: ProjectItem) {
     project.expanded = !project.expanded
     void toggleProjectExpanded({
-      projectId: project.id || project.name,
+      projectId: project.id || project.path || project.name,
       expanded: project.expanded,
     })
   }
 
-  /**
-   * 处理左侧主导航动作。
-   *
-   * @param item 主导航项
-   */
+  function handlePickProjectFolder() {
+    void pickProjectFolder({}).then((response) => {
+      if (response.success && response.data) {
+        applySnapshot(response.data)
+      }
+    })
+  }
+
+  function handleRefreshProjects() {
+    void refreshAppScopes(['projects', 'conversation', 'plan', 'git', 'context']).then((response) => {
+      if (response.success && response.data) {
+        applySnapshot(response.data)
+      }
+    })
+  }
+
   function handlePrimaryAction(item: NavigationItem) {
     if (item.id === 'new-conversation') {
+      if (!hasProject.value) {
+        handlePickProjectFolder()
+        return
+      }
+
       void createConversation({
         projectId: activeProjectId.value,
         title: '新对话',
+      }).then((response) => {
+        if (response.success && response.data) {
+          applySnapshot(response.data)
+        }
       })
       return
     }
@@ -440,74 +398,62 @@ export function useHarnessDashboard() {
     }
 
     if (item.id === 'plugins' || item.id === 'automation') {
-      void openPanel({
-        panel: item.id,
-      })
+      void openPanel({ panel: item.id })
     }
   }
 
-  /**
-   * 打开项目。
-   *
-   * @param project 项目
-   */
   function handleOpenProject(project: ProjectItem) {
-    activeProjectId.value = project.id || project.name
+    activeProjectId.value = project.id || project.path || project.name
     void openProject({
       projectId: activeProjectId.value,
+    }).then((response) => {
+      if (response.success && response.data) {
+        applySnapshot(response.data)
+      }
     })
   }
 
-  /**
-   * 打开会话。
-   *
-   * @param session 会话
-   */
   function handleOpenSession(session: SessionItem) {
     activeConversationId.value = session.id || session.title
     void openConversation({
       conversationId: activeConversationId.value,
+    }).then((response) => {
+      if (response.success && response.data) {
+        applySnapshot(response.data)
+      }
     })
   }
 
-  /**
-   * 处理左侧底部面板入口。
-   *
-   * @param item 底部操作项
-   */
   function handleFooterAction(item: FooterItem) {
-    if (!item.panel) {
+    if (item.panel) {
+      void openPanel({ panel: item.panel })
+    }
+  }
+
+  function handleRefreshConversation() {
+    if (!activeConversationId.value) {
       return
     }
 
-    void openPanel({
-      panel: item.panel,
-    })
-  }
-
-  /**
-   * 刷新当前会话。
-   */
-  function handleRefreshConversation() {
     void refreshConversation({
       conversationId: activeConversationId.value,
+    }).then((response) => {
+      if (response.success && response.data) {
+        applySnapshot(response.data)
+      }
     })
   }
 
-  /**
-   * 获取当前会话更多操作。
-   */
   function handleGetConversationActions() {
+    if (!activeConversationId.value) {
+      return
+    }
+
     void getConversationActions({
       conversationId: activeConversationId.value,
     })
   }
 
-  /**
-   * 记录消息复制行为。
-   *
-   * @param messageId 消息编号
-   */
   function handleCopyMessage(messageId: string) {
     void copyMessage({
       conversationId: activeConversationId.value,
@@ -515,11 +461,6 @@ export function useHarnessDashboard() {
     })
   }
 
-  /**
-   * 打开生成文件。
-   *
-   * @param file 生成文件
-   */
   function handleOpenGeneratedFile(file: GeneratedFile) {
     void openGeneratedFile({
       conversationId: activeConversationId.value,
@@ -527,9 +468,6 @@ export function useHarnessDashboard() {
     })
   }
 
-  /**
-   * 选择附件。
-   */
   function handlePickAttachment() {
     void pickAttachment({
       conversationId: activeConversationId.value,
@@ -537,9 +475,6 @@ export function useHarnessDashboard() {
     })
   }
 
-  /**
-   * 选择上下文。
-   */
   function handlePickContext() {
     void pickContext({
       conversationId: activeConversationId.value,
@@ -547,9 +482,6 @@ export function useHarnessDashboard() {
     })
   }
 
-  /**
-   * 选择工具。
-   */
   function handlePickTool() {
     void pickTool({
       conversationId: activeConversationId.value,
@@ -557,12 +489,11 @@ export function useHarnessDashboard() {
     })
   }
 
-  /**
-   * 发送用户消息。
-   *
-   * @param payload 消息与运行配置
-   */
   function handleSendMessage(payload: SendMessagePayload) {
+    if (!activeConversationId.value) {
+      return
+    }
+
     void sendConversationMessage({
       conversationId: activeConversationId.value,
       parentTaskId: '',
@@ -574,11 +505,6 @@ export function useHarnessDashboard() {
     })
   }
 
-  /**
-   * 更新运行配置。
-   *
-   * @param settings 运行配置
-   */
   function handleRuntimeSettingsChange(settings: RuntimeSettingsPayload) {
     void updateRuntimeSettings({
       projectId: activeProjectId.value,
@@ -587,29 +513,16 @@ export function useHarnessDashboard() {
     })
   }
 
-  /**
-   * 回复审批弹窗。
-   *
-   * @param payload 审批回复参数
-   */
   function handleApprovalResponse(payload: ApprovalResponsePayload) {
     void respondApprovalPrompt(payload)
     bridgePrompt.value = null
   }
 
-  /**
-   * 回复计划弹窗。
-   *
-   * @param payload 计划回复参数
-   */
   function handlePlanResponse(payload: PlanResponsePayload) {
     void respondPlanPrompt(payload)
     bridgePrompt.value = null
   }
 
-  /**
-   * 关闭当前弹窗。
-   */
   function handlePromptClose() {
     bridgePrompt.value = null
   }
@@ -617,27 +530,74 @@ export function useHarnessDashboard() {
   onMounted(() => {
     unregisterHarnessUI = registerHarnessUI({
       'app.snapshot.updated': applySnapshot,
-      'project.list.updated': (payload) => {
-        if (isRecord(payload) && Array.isArray(payload.projects)) {
-          projects.value = payload.projects.map(mapProjectItem)
-          activeProjectId.value = readString(payload, 'activeProjectId', activeProjectId.value)
-          activeConversationId.value = readString(payload, 'activeConversationId', activeConversationId.value)
+      'project.list.updated': applyProjectList,
+      'conversation.active.changed': applySnapshot,
+      'conversation.updated': (payload) => {
+        if (isRecord(payload)) {
+          applyConversation(payload.conversation)
+        }
+      },
+      'conversation.message.started': (payload) => {
+        if (isRecord(payload) && isRecord(payload.assistantMessage)) {
+          replaceOrAppendMessage(currentMessages.value, mapMessage(payload.assistantMessage))
+        }
+      },
+      'conversation.message.delta': (payload) => {
+        if (!isRecord(payload)) {
+          return
+        }
+
+        const messageId = readString(payload, 'assistantMessageId')
+        const message = currentMessages.value.find((item) => item.id === messageId)
+        if (message) {
+          message.content = readString(payload, 'fullContent', message.content + readString(payload, 'delta'))
+        }
+      },
+      'conversation.message.finished': (payload) => {
+        if (!isRecord(payload)) {
+          return
+        }
+
+        const messageId = readString(payload, 'assistantMessageId')
+        const message = currentMessages.value.find((item) => item.id === messageId)
+        if (message) {
+          message.content = readString(payload, 'content', message.content)
+          message.status = readString(payload, 'status', 'done')
+        }
+      },
+      'conversation.message.failed': (payload) => {
+        if (!isRecord(payload)) {
+          return
+        }
+
+        const messageId = readString(payload, 'assistantMessageId')
+        const message = currentMessages.value.find((item) => item.id === messageId)
+        if (message) {
+          message.content = readString(payload, 'message', message.content)
+          message.status = readString(payload, 'status', 'error')
+        }
+      },
+      'conversation.message.cancelled': (payload) => {
+        if (!isRecord(payload)) {
+          return
+        }
+
+        const messageId = readString(payload, 'assistantMessageId')
+        const message = currentMessages.value.find((item) => item.id === messageId)
+        if (message) {
+          message.status = readString(payload, 'status', 'cancelled')
         }
       },
       'execution.plan.updated': (payload) => {
-        if (isRecord(payload) && Array.isArray(payload.steps)) {
-          currentPlanSteps.value = payload.steps.map(mapPlanStep)
-        }
+        currentPlanSteps.value = isRecord(payload) && Array.isArray(payload.steps) ? payload.steps.map(mapPlanStep) : []
       },
       'tool.execution.updated': (payload) => {
-        if (isRecord(payload) && Array.isArray(payload.executions)) {
-          currentToolExecutions.value = payload.executions.map(mapToolExecution)
-        }
+        currentToolExecutions.value =
+          isRecord(payload) && Array.isArray(payload.executions) ? payload.executions.map(mapToolExecution) : []
       },
       'generated.files.updated': (payload) => {
-        if (isRecord(payload) && Array.isArray(payload.files)) {
-          currentGeneratedFiles.value = payload.files.map(mapGeneratedFile)
-        }
+        currentGeneratedFiles.value =
+          isRecord(payload) && Array.isArray(payload.files) ? payload.files.map(mapGeneratedFile) : []
       },
       'git.status.updated': (payload) => {
         gitStatus.value = mapGitStatus(payload)
@@ -675,6 +635,9 @@ export function useHarnessDashboard() {
     planSteps: currentPlanSteps,
     toolExecutions: currentToolExecutions,
     generatedFiles: currentGeneratedFiles,
+    messages: currentMessages,
+    conversationTitle: currentConversationTitle,
+    activeConversationId,
     sessionInfo,
     toolCalls,
     plugins,
@@ -682,6 +645,8 @@ export function useHarnessDashboard() {
     contextUsage,
     bridgePrompt,
     handleProjectToggle,
+    handlePickProjectFolder,
+    handleRefreshProjects,
     handlePrimaryAction,
     handleOpenProject,
     handleOpenSession,

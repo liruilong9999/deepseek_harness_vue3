@@ -15,26 +15,23 @@
       <div class="section-title">
         <span>项目</span>
         <div class="section-actions">
-          <button class="mini-button" title="新增项目" type="button">
-            <Plus class="button-icon" />
+          <button class="mini-button" title="打开文件夹" type="button" @click="emit('pick-project-folder')">
+            <FolderPlus class="button-icon" />
           </button>
-          <button class="mini-button" title="刷新项目" type="button">
+          <button class="mini-button" title="刷新项目" type="button" @click="emit('refresh-projects')">
             <RefreshCw class="button-icon" />
           </button>
         </div>
       </div>
 
       <div class="sidebar-scroll">
-        <div class="project-list">
-          <template v-for="project in projects" :key="project.name">
-            <article
-              class="project-item"
-              :class="{ active: project.active }"
-              @click="emit('open-project', project)"
-            >
+        <p v-if="projects.length === 0" class="empty-tip">还没有打开项目，点击上方文件夹按钮选择一个工作目录。</p>
+        <div v-else class="project-list">
+          <template v-for="project in projects" :key="project.id || project.path || project.name">
+            <article class="project-item" :class="{ active: project.active }" @click="emit('open-project', project)">
               <FolderClosed class="folder-icon" />
               <div class="project-meta">
-                <strong>{{ project.name }}</strong>
+                <strong>{{ project.name || '未命名项目' }}</strong>
                 <small>{{ project.path }}</small>
               </div>
               <time>{{ project.time }}</time>
@@ -45,16 +42,17 @@
             </article>
 
             <div v-if="project.expanded" class="project-sessions">
+              <p v-if="project.sessions.length === 0" class="session-empty">暂无会话，点击“新对话”创建。</p>
               <button
                 v-for="session in project.sessions"
-                :key="session.title"
+                :key="session.id || session.title"
                 class="project-session"
                 :class="{ active: session.active }"
                 type="button"
                 @click="emit('open-session', session)"
               >
                 <CircleCheck class="session-state" />
-                <span>{{ session.title }}</span>
+                <span>{{ session.title || '未命名会话' }}</span>
                 <time>{{ session.time }}</time>
               </button>
             </div>
@@ -73,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { ChevronDown, ChevronUp, CircleCheck, FolderClosed, Plus, RefreshCw } from 'lucide-vue-next'
+import { ChevronDown, ChevronUp, CircleCheck, FolderClosed, FolderPlus, RefreshCw } from 'lucide-vue-next'
 
 import type { FooterItem, NavigationItem, ProjectItem, SessionItem } from '@/types/business/harness'
 
@@ -89,6 +87,10 @@ defineProps<{
 const emit = defineEmits<{
   /** 点击主导航时触发。 */
   'primary-action': [item: NavigationItem]
+  /** 选择本地项目文件夹。 */
+  'pick-project-folder': []
+  /** 刷新项目列表。 */
+  'refresh-projects': []
   /** 点击项目时触发。 */
   'open-project': [project: ProjectItem]
   /** 点击项目展开按钮时触发。 */
@@ -107,7 +109,7 @@ const emit = defineEmits<{
   flex-direction: column;
   overflow: hidden;
   padding: 1rem 1rem 0;
-  background: rgb(26, 33, 44);
+  background: rgb(26, 34, 39);
 }
 
 .primary-actions {
@@ -115,7 +117,6 @@ const emit = defineEmits<{
   display: grid;
   gap: 0.4375rem;
   padding-bottom: 1.125rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .nav-action,
@@ -137,6 +138,7 @@ const emit = defineEmits<{
 
 .nav-action:hover,
 .project-item.active,
+.project-item:hover,
 .project-session.active,
 .project-session:hover {
   background: rgba(255, 255, 255, 0.08);
@@ -198,11 +200,38 @@ kbd,
   gap: 0.375rem;
 }
 
+.mini-button {
+  width: 2rem;
+  height: 2rem;
+  display: inline-grid;
+  place-items: center;
+  color: #d7e2e6;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.055);
+}
+
+.mini-button:hover {
+  background: rgba(255, 255, 255, 0.11);
+}
+
 .sidebar-scroll {
   min-height: 0;
   flex: 1;
   overflow-y: auto;
   padding-bottom: 0.625rem;
+}
+
+.empty-tip,
+.session-empty {
+  margin: 0;
+  color: #8fa0a8;
+  line-height: 1.55;
+}
+
+.empty-tip {
+  padding: 0.875rem;
+  border-radius: 0.875rem;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .project-list {
@@ -258,6 +287,10 @@ kbd,
   margin: -0.125rem 0 0.3125rem 2.1875rem;
 }
 
+.session-empty {
+  padding: 0.5rem 0.625rem;
+}
+
 .project-session {
   grid-template-columns: 1.375rem minmax(0, 1fr) auto;
   gap: 0.5rem;
@@ -273,7 +306,6 @@ kbd,
   gap: 0.875rem;
   margin: 0 -1rem;
   padding: 0.875rem 1rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .sidebar-footer button {

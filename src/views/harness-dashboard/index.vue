@@ -6,6 +6,8 @@
         :projects="projects"
         :footer-items="footerItems"
         @toggle-project="handleProjectToggle"
+        @pick-project-folder="handlePickProjectFolder"
+        @refresh-projects="handleRefreshProjects"
         @primary-action="handlePrimaryAction"
         @open-project="handleOpenProject"
         @open-session="handleOpenSession"
@@ -14,9 +16,9 @@
     </template>
 
     <ConversationPanel
-      title="设计 DeepSeek Harness GUI 方案"
-      :features="features"
-      :plan-steps="planSteps"
+      :title="conversationTitle"
+      :conversation-id="activeConversationId"
+      :messages="messages"
       :tool-executions="toolExecutions"
       :generated-files="generatedFiles"
       :bridge-prompt="bridgePrompt"
@@ -59,10 +61,12 @@ const {
   navigationItems,
   projects,
   footerItems,
-  features,
   planSteps,
   toolExecutions,
   generatedFiles,
+  messages,
+  conversationTitle,
+  activeConversationId,
   sessionInfo,
   toolCalls,
   plugins,
@@ -70,6 +74,8 @@ const {
   contextUsage,
   bridgePrompt,
   handleProjectToggle,
+  handlePickProjectFolder,
+  handleRefreshProjects,
   handlePrimaryAction,
   handleOpenProject,
   handleOpenSession,

@@ -24,6 +24,10 @@ export function listProjects(payload: BridgePayload) {
   return callHarnessAction('project.list', payload)
 }
 
+export function pickProjectFolder(payload: BridgePayload) {
+  return callHarnessAction('project.pickFolder', payload)
+}
+
 /**
  * 打开项目。
  *

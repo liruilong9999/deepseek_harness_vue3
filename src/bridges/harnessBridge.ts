@@ -19,6 +19,7 @@ export type HarnessAction =
   | 'app.getSnapshot'
   | 'app.refresh'
   | 'project.list'
+  | 'project.pickFolder'
   | 'project.open'
   | 'project.toggleExpanded'
   | 'conversation.open'
