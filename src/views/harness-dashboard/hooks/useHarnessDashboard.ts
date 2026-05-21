@@ -360,6 +360,14 @@ export function useHarnessDashboard() {
       if (response.success && response.data) {
         applySnapshot(response.data)
       }
+
+      if (response.success) {
+        void fetchAppSnapshot().then((snapshotResponse) => {
+          if (snapshotResponse.success && snapshotResponse.data) {
+            applySnapshot(snapshotResponse.data)
+          }
+        })
+      }
     })
   }
 
