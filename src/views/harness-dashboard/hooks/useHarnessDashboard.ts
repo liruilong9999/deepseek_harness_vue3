@@ -22,7 +22,7 @@ import {
   toggleProjectExpanded,
   updateRuntimeSettings,
 } from '@/api/harnessBridgeActions'
-import { registerHarnessUI } from '@/bridges/harnessBridge'
+import { registerHarnessUI, waitForHarnessBridge } from '@/bridges/harnessBridge'
 import {
   features,
   footerItems,
@@ -624,10 +624,16 @@ export function useHarnessDashboard() {
       },
     })
 
-    void fetchAppSnapshot().then((response) => {
-      if (response.success && response.data) {
-        applySnapshot(response.data)
+    void waitForHarnessBridge().then((ready) => {
+      if (!ready) {
+        return
       }
+
+      void fetchAppSnapshot().then((response) => {
+        if (response.success && response.data) {
+          applySnapshot(response.data)
+        }
+      })
     })
   })
 

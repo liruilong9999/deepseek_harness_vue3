@@ -200,6 +200,33 @@ export async function invokeHarnessBridge<TData = unknown, TPayload extends obje
 }
 
 /**
+ * 等待 Qt WebChannel 注入后端桥接对象。
+ *
+ * Qt 注入 qwebchannel.js 后会异步把注册对象挂到 window 上，页面刚挂载时可能还拿不到。
+ */
+export function waitForHarnessBridge(timeoutMs = 3000, intervalMs = 50): Promise<boolean> {
+  const startedAt = Date.now()
+
+  return new Promise((resolve) => {
+    const checkBridge = () => {
+      if (window.harnessBridge?.invoke) {
+        resolve(true)
+        return
+      }
+
+      if (Date.now() - startedAt >= timeoutMs) {
+        resolve(false)
+        return
+      }
+
+      window.setTimeout(checkBridge, intervalMs)
+    }
+
+    checkBridge()
+  })
+}
+
+/**
  * 分发 Qt 后端推送事件。
  *
  * @param eventName 事件名称
